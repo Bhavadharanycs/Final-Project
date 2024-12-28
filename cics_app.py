@@ -3,21 +3,23 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # Streamlit UI Design
-st.set_page_config(page_title="Car Insurance EDA", layout="wide")
+st.set_page_config(page_title="Insurance Claim Prediction", layout="wide")
 
-st.title("🚗 Car Insurance EDA Analysis")
+st.title("🚗 Insurance Claim Prediction")
 st.markdown("""
-This application performs an **Exploratory Data Analysis (EDA)** on car insurance claim data.  
-Explore correlations, distributions, and relationships between variables.
+This application performs an **Exploratory Data Analysis (EDA)** and predicts the **amount of claim** (`CLM_AMT`)  
+based on the given insurance data.
 """)
 
 # Load Predefined Dataset
 @st.cache
 def load_data():
-    # Replace this with the path to your dataset if it's stored locally
-    data = pd.read_csv("car_insurance_claim.csv")  # Ensure this file is in the same directory or provide a full path.
+    data = pd.read_csv("car_insurance_claim.csv")  # Ensure the dataset file is in the same directory
     return data
 
 # Load data
@@ -75,34 +77,40 @@ sns.histplot(preprocessed_data['CLM_AMT'], kde=True, bins=30, ax=ax)
 ax.set_title("Distribution of CLM_AMT")
 st.pyplot(fig)
 
-# Pairplot for Selected Variables
-st.subheader("Pairplot for Selected Variables")
-selected_cols = st.multiselect("Choose columns for pairplot", options=preprocessed_data.columns, default=['CLM_AMT', 'INCOME', 'BLUEBOOK', 'CALCULATED_AGE'])
-if len(selected_cols) > 1:
-    pairplot_fig = sns.pairplot(preprocessed_data[selected_cols], diag_kind='kde', corner=True)
-    st.pyplot(pairplot_fig)
+# Model Training Section
+st.header("Insurance Claim Prediction")
 
-# Outlier Handling
-st.subheader("Outliers in Target Variable (CLM_AMT)")
-Q1 = preprocessed_data['CLM_AMT'].quantile(0.25)
-Q3 = preprocessed_data['CLM_AMT'].quantile(0.75)
-IQR = Q3 - Q1
-lower_bound = Q1 - 1.5 * IQR
-upper_bound = Q3 + 1.5 * IQR
-outliers = preprocessed_data[(preprocessed_data['CLM_AMT'] < lower_bound) | (preprocessed_data['CLM_AMT'] > upper_bound)]
+# Split data into features and target
+features = preprocessed_data.drop(columns=['CLM_AMT', 'ID'])
+target = preprocessed_data['CLM_AMT']
 
-st.write(f"Number of outliers: {len(outliers)}")
-st.write(f"Outliers are values outside the range [{lower_bound:.2f}, {upper_bound:.2f}].")
+# Split into train and test sets
+X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=42)
 
-# Show Outliers
-if st.checkbox("Show Outlier Rows"):
-    st.dataframe(outliers)
+# Train the model
+model = RandomForestRegressor(random_state=42)
+model.fit(X_train, y_train)
 
-# Distribution of Numerical Columns
-st.subheader("Distribution of Numerical Variables")
-numeric_columns = preprocessed_data.select_dtypes(include=['float64', 'int64']).columns
-selected_numeric = st.selectbox("Choose a numerical column", options=numeric_columns, index=0)
-fig, ax = plt.subplots(figsize=(8, 4))
-sns.histplot(preprocessed_data[selected_numeric], kde=True, bins=30, ax=ax)
-ax.set_title(f"Distribution of {selected_numeric}")
-st.pyplot(fig)
+# Model evaluation
+y_pred = model.predict(X_test)
+mae = mean_absolute_error(y_test, y_pred)
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+r2 = r2_score(y_test, y_pred)
+
+st.write("### Model Evaluation Metrics")
+st.write(f"**Mean Absolute Error (MAE):** {mae:.2f}")
+st.write(f"**Mean Squared Error (MSE):** {mse:.2f}")
+st.write(f"**Root Mean Squared Error (RMSE):** {rmse:.2f}")
+st.write(f"**R² Score:** {r2:.2f}")
+
+# User Inputs for Prediction
+st.write("### Predict Claim Amount")
+input_data = {}
+for col in features.columns:
+    input_data[col] = st.number_input(f"{col}", value=float(X_train[col].median()))
+
+input_df = pd.DataFrame([input_data])
+prediction = model.predict(input_df)
+
+st.write(f"**Predicted Claim Amount:** ${prediction[0]:,.2f}")
