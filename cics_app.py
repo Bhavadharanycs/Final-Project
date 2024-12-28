@@ -13,7 +13,7 @@ def clean_currency_columns(df, columns):
 
 # Function to preprocess the dataset
 def preprocess_data(file_path):
-    df = pd.read_csv(file_path)
+    df = pd.read_csv('car_insurance_claim.csv')
 
     # Clean currency columns
     currency_columns = ['INCOME', 'HOME_VAL', 'BLUEBOOK', 'OLDCLAIM', 'CLM_AMT']
