@@ -3,17 +3,14 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # Streamlit UI Design
-st.set_page_config(page_title="Car Insurance Claim Prediction", layout="wide")
+st.set_page_config(page_title="Car Insurance EDA", layout="wide")
 
-st.title("🚗 Car Insurance Claim Prediction")
+st.title("🚗 Car Insurance EDA Analysis")
 st.markdown("""
-This application helps analyze car insurance claim data, handle missing values and outliers, and predict insurance claim amounts.  
-Interact with the app to discover insights and make predictions.
+This application performs an **Exploratory Data Analysis (EDA)** on car insurance claim data.  
+Explore correlations, distributions, and relationships between variables.
 """)
 
 # Load Predefined Dataset
@@ -24,10 +21,7 @@ def load_data():
     return data
 
 # Load data
-st.header("1️⃣ Data Overview")
 data = load_data()
-st.write("### Dataset Sample:")
-st.dataframe(data.head())
 
 # Preprocessing Function
 def preprocess_data(df):
@@ -64,65 +58,51 @@ def preprocess_data(df):
 
 # Preprocess data
 preprocessed_data = preprocess_data(data)
-st.write("### Preprocessed Dataset:")
-st.dataframe(preprocessed_data.head())
 
 # EDA Section
-st.header("2️⃣ Exploratory Data Analysis (EDA)")
-st.write("### Correlation Heatmap")
+st.header("Exploratory Data Analysis (EDA)")
+
+# Correlation Heatmap
+st.subheader("Correlation Heatmap")
 fig, ax = plt.subplots(figsize=(12, 8))
-sns.heatmap(preprocessed_data.corr(), cmap="coolwarm", ax=ax)
+sns.heatmap(preprocessed_data.corr(), cmap="coolwarm", annot=False, ax=ax)
 st.pyplot(fig)
 
-st.write("### Distribution of Target Variable (CLM_AMT)")
+# Distribution of Target Variable (CLM_AMT)
+st.subheader("Distribution of Claim Amount (CLM_AMT)")
 fig, ax = plt.subplots(figsize=(8, 4))
-sns.histplot(preprocessed_data['CLM_AMT'], kde=True, ax=ax, bins=30)
+sns.histplot(preprocessed_data['CLM_AMT'], kde=True, bins=30, ax=ax)
 ax.set_title("Distribution of CLM_AMT")
 st.pyplot(fig)
 
+# Pairplot for Selected Variables
+st.subheader("Pairplot for Selected Variables")
+selected_cols = st.multiselect("Choose columns for pairplot", options=preprocessed_data.columns, default=['CLM_AMT', 'INCOME', 'BLUEBOOK', 'CALCULATED_AGE'])
+if len(selected_cols) > 1:
+    pairplot_fig = sns.pairplot(preprocessed_data[selected_cols], diag_kind='kde', corner=True)
+    st.pyplot(pairplot_fig)
+
 # Outlier Handling
+st.subheader("Outliers in Target Variable (CLM_AMT)")
 Q1 = preprocessed_data['CLM_AMT'].quantile(0.25)
 Q3 = preprocessed_data['CLM_AMT'].quantile(0.75)
 IQR = Q3 - Q1
 lower_bound = Q1 - 1.5 * IQR
 upper_bound = Q3 + 1.5 * IQR
-preprocessed_data['CLM_AMT'] = np.clip(preprocessed_data['CLM_AMT'], lower_bound, upper_bound)
+outliers = preprocessed_data[(preprocessed_data['CLM_AMT'] < lower_bound) | (preprocessed_data['CLM_AMT'] > upper_bound)]
 
-st.write("### Outliers Handled in Target Variable")
-st.write(f"Values outside [{lower_bound:.2f}, {upper_bound:.2f}] have been capped.")
+st.write(f"Number of outliers: {len(outliers)}")
+st.write(f"Outliers are values outside the range [{lower_bound:.2f}, {upper_bound:.2f}].")
 
-# Prediction Section
-st.header("3️⃣ Prediction")
-features = preprocessed_data.drop(columns=['CLM_AMT', 'ID'])
-target = preprocessed_data['CLM_AMT']
+# Show Outliers
+if st.checkbox("Show Outlier Rows"):
+    st.dataframe(outliers)
 
-# Split data
-X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=42)
-
-# Train model
-model = RandomForestRegressor(random_state=42)
-model.fit(X_train, y_train)
-
-# Model evaluation
-y_pred = model.predict(X_test)
-mae = mean_absolute_error(y_test, y_pred)
-mse = mean_squared_error(y_test, y_pred)
-rmse = np.sqrt(mse)
-r2 = r2_score(y_test, y_pred)
-
-st.write("### Model Evaluation Metrics")
-st.write(f"**Mean Absolute Error (MAE):** {mae:.2f}")
-st.write(f"**Mean Squared Error (MSE):** {mse:.2f}")
-st.write(f"**Root Mean Squared Error (RMSE):** {rmse:.2f}")
-st.write(f"**R² Score:** {r2:.2f}")
-
-# Predict on new input
-st.write("### Predict Claim Amount")
-input_data = {}
-for col in features.columns:
-    input_data[col] = st.number_input(f"{col}", value=float(X_train[col].median()))
-
-input_df = pd.DataFrame([input_data])
-prediction = model.predict(input_df)
-
-st.write(f"**Predicted Claim Amount:** ${prediction[0]:,.2f}")
+# Distribution of Numerical Columns
+st.subheader("Distribution of Numerical Variables")
+numeric_columns = preprocessed_data.select_dtypes(include=['float64', 'int64']).columns
+selected_numeric = st.selectbox("Choose a numerical column", options=numeric_columns, index=0)
+fig, ax = plt.subplots(figsize=(8, 4))
+sns.histplot(preprocessed_data[selected_numeric], kde=True, bins=30, ax=ax)
+ax.set_title(f"Distribution of {selected_numeric}")
+st.pyplot(fig)
